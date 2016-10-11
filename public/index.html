@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <link rel="stylesheet" href="css/style.css">
+    
+    <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBhiZvT9mbE4rL_TG-CJ7QvPGGMtPZ0LGI"></script>
+    
+    <script src="js/markerClusterer.js" type="text/javascript"></script>
+    <script src="js/client.js" type="text/javascript"></script>
+</head>
+
+<body onload="init()">
+    <div id="track_panel">
+        <form id="track_form" method="get">
+            <input id="track_field" name="track" type="text"
+                    placeholder="Enter keywords to track..."
+                    title="Comma-delimited with no spaces" />
+            <input id="track_submit" type="submit" value="Submit" />
+        </form>
+        <form id="track_all" method="get">
+            <input name="track_all" type="hidden" value="true" />
+            <input class="submitlink" type="submit" value="Track all tweets" />
+        </form>
+        <form id="track_ww_trends" method="get">
+            <input name="trends_woeid" type="hidden" value="1" />
+            <input class="submitlink" type="submit" value="Track Worldwide trends" />
+        </form>
+        <form id="track_aus_trends" method="get">
+            <input name="trends_woeid" type="hidden" value="23424748" />
+            <input class="submitlink" type="submit" value="Track Australian trends" />
+        </form>
+        <div id="map_actions">
+            <input type="button" onclick="clearMarkers();" value="Clear markers" />
+            <input type="button" onclick="resetZoom();" value="Reset zoom" />
+            <input type="button" onclick="stopStream();" value="Stop stream" />
+        </div>
+    </div>
+    
+    <div id="map_canvas"></div>
+    
+    <div id="tracking_box">
+        <span class="bold">Currently tracking:</span> <span id="tracking_info"></span>
+    </div>
+</body>
+
+</html>
