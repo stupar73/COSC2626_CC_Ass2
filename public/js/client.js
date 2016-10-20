@@ -16,17 +16,7 @@ function init()
         mapOptions
     );
 
-    var clusterStyle = [{
-        url: '../images/pin.png',
-        height: 48,
-        width: 30,
-        anchor: [-18, 0],
-        textColor: '#ffffff',
-        textSize: 10,
-        iconAnchor: [15, 48]
-    }];
     var clustererOptions = {
-        styles: clusterStyle,
         gridSize: 40
     };
     markerClusterer = new MarkerClusterer(map, null, clustererOptions);
@@ -93,6 +83,7 @@ function init()
         socket.on("connected", function(r)
         {
             socket.emit("tracking what");
+            clearMarkers();
             socket.emit("start tweets");
         });
     }
@@ -104,7 +95,11 @@ function addMarker(marker)
     markers.push(marker);
     if (markerClusterer !== null)
     {
-        markerClusterer.addMarker(marker);
+        // Add to cluster after 0.5s so the marker drop animation can be seen
+        setTimeout(function()
+        {
+            markerClusterer.addMarker(marker);
+        }, 500);
     }
     if (marker.infowindow !== null)
     {

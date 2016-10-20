@@ -18,6 +18,7 @@ body {
     background-color: #ffffff;
     border: 1px solid #999999;
     z-index: 10;
+    background-color: rgba(255, 255, 255, 0.8);
 }
 
 #track_field {
@@ -43,6 +44,7 @@ body {
     background-color: #ffffff;
     border: 1px solid #999999;
     z-index: 10;
+    background-color: rgba(255, 255, 255, 0.8);
     visibility: hidden;
 }
 
