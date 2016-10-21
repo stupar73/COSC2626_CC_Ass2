@@ -4,11 +4,12 @@
   "author": "Stuart Parker",
   "private": true,
   "scripts": {
-    "start": "node app"
+    "start": "node server"
   },
   "dependencies": {
     "express": "*",
     "twitter": "*",
-    "socket.io": "*"
+    "socket.io": "*",
+    "aws-sdk": "*"
   }
 }

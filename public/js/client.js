@@ -82,7 +82,6 @@ function init()
 
         socket.on("connected", function(r)
         {
-            socket.emit("tracking what");
             clearMarkers();
             socket.emit("start tweets");
         });

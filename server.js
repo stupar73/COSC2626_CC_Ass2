@@ -2,7 +2,8 @@
 var twitter = require('twitter'),
     express = require('express'),
     http = require('http'),
-    socketio = require('socket.io');
+    socketio = require('socket.io'),
+    aws = require('aws-sdk');
 
 // Setup server and socket
 var app = express(),
@@ -18,6 +19,12 @@ var twitter_api = new twitter({
 });
 var stream = null;
 
+// Setup AWS
+aws.config.region = process.env.DDB_REGION;
+var dynamodb = new aws.DynamoDB.DocumentClient();
+var trendsTable = process.env.TRENDS_TABLE;
+
+// Setup server
 app.set("port", process.env.PORT || 8088)
 app.use("/js", express.static(__dirname + "/public/js"));
 app.use("/css", express.static(__dirname + "/public/css"));
@@ -40,6 +47,7 @@ app.get("/", function(req, res)
     {
         twitter_api.get("trends/place", {id: req.query.trends_woeid}, function(error, result, response)
         {
+            // Create array of all trends to track for this WOEID
             var trends = [];
             result[0].trends.forEach(function(trend)
             {
@@ -47,12 +55,43 @@ app.get("/", function(req, res)
             });
             streamParams = {track: trends.join()};
 
-            tracking = {};
-            tracking.trends_from = result[0].locations[0].name;
-            tracking.keywords = trends;
+            // Create tracking object used to inform client what's being tracked
+            tracking = {
+                woeid: result[0].locations[0].woeid,
+                trends_from: result[0].locations[0].name,
+                keywords: trends
+            };
+            
+            // Insert these trends into DynamoDB
+            var updateString = "SET  location_name = :location_name, historical_trends = list_append(if_not_exists(historical_trends, :empty_list), :new)"
+            var params = {
+                TableName: trendsTable,
+                Key: {
+                    woeid: tracking.woeid
+                },
+                UpdateExpression: updateString,
+                ExpressionAttributeValues: {
+                    ":location_name": tracking.trends_from,
+                    ":empty_list": [],
+                    ":new": [
+                        {
+                            created_at: result[0].created_at,
+                            trends: result[0].trends
+                        }
+                    ]
+                }
+            };
+            dynamodb.update(params, function(err, data)
+            {
+                if (err)
+                {
+                    console.error("Error occured while attempting to insert "
+                            + "trends into DynamoDB.\n", JSON.stringify(err, null, 2));
+                }
+            });
         });
     }
-    // Otherwise just get all tweets with a location and display them
+    // Otherwise check if all tweets with location were requested
     else if (req.query.track_all == "true")
     {
         streamParams = {locations: "-180,-90,180,90"};
@@ -75,18 +114,13 @@ io.sockets.on("connection", function(socket)
 {
     socket.emit("connected");
 
-    // Inform client of what is being tracked
-    socket.on("tracking what", function()
-    {
-        socket.emit("tracking", tracking);
-    });
-
     socket.on("start tweets", function()
     {
         if (streamParams.track != undefined
                 || streamParams.locations != undefined)
         {
             console.log("streamParams = " + JSON.stringify(streamParams, null, 2));
+            socket.emit("tracking", tracking);
             if (stream !== null)
             {
                 stream.destroy();
@@ -95,38 +129,40 @@ io.sockets.on("connection", function(socket)
             twitter_api.stream("statuses/filter", streamParams, function(s)
             {
                 stream = s;
-                stream.on("data", function(tweet)
+                stream.on("data", function(data)
                 {
                     // Check there were coordinates in retrieved tweets
-                    if (tweet.coordinates)
+                    if (data.coordinates)
                     {
-                        if (tweet.coordinates !== null)
+                        if (data.coordinates !== null)
                         {
                             /*
                              * Construct JSON of the parts of the tweet we care
                              * about to output over web socket
                              */
                             var tweet = {
-                                "twitter_handle": tweet.user.screen_name,
-                                "display_name": tweet.user.name,
-                                "text": tweet.text,
-                                "time": tweet.created_at,
-                                "coordinates": {
-                                    "lng": tweet.coordinates.coordinates[0],
-                                    "lat": tweet.coordinates.coordinates[1]
+                                twitter_handle: data.user.screen_name,
+                                display_name: data.user.name,
+                                text: data.text,
+                                time: data.created_at,
+                                coordinates: {
+                                    lng: data.coordinates.coordinates[0],
+                                    lat: data.coordinates.coordinates[1]
                                 }
                             };
-                            console.log(JSON.stringify(tweet, null, 2));
+                            console.log("Tweet found from ("
+                                    + tweet.coordinates.lng + ", "
+                                    + tweet.coordinates.lat + ")");
 
                             socket.emit("twitter-stream", tweet);
                         }
                     }
                 });
 
-                stream.on("error", function(error)
+                stream.on("error", function(err)
                 {
-                    console.log(error);
-                    throw error;
+                    console.error(JSON.stringify(err, null, 2));
+                    throw err;
                 });
             });
         }
@@ -139,5 +175,8 @@ io.sockets.on("connection", function(socket)
             console.log("Tweet stream stopped.");
             stream.destroy();
         }
+        stream = null;
+        streamParams = {};
+        tracking = {};
     });
 });
